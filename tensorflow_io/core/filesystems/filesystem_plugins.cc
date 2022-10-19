@@ -30,6 +30,9 @@ TFIO_PLUGIN_EXPORT void TF_InitPlugin(TF_FilesystemPluginInfo* info) {
   info->plugin_memory_allocate = tensorflow::io::plugin_memory_allocate;
   info->plugin_memory_free = tensorflow::io::plugin_memory_free;
   info->num_schemes = 7;
+#if !defined(__APPLE__)
+  info->num_schemes += 1;
+#endif
   info->ops = static_cast<TF_FilesystemPluginOps*>(
       tensorflow::io::plugin_memory_allocate(info->num_schemes *
                                              sizeof(info->ops[0])));
@@ -40,4 +43,7 @@ TFIO_PLUGIN_EXPORT void TF_InitPlugin(TF_FilesystemPluginInfo* info) {
   tensorflow::io::hdfs::ProvideFilesystemSupportFor(&info->ops[4], "hdfs");
   tensorflow::io::hdfs::ProvideFilesystemSupportFor(&info->ops[5], "viewfs");
   tensorflow::io::hdfs::ProvideFilesystemSupportFor(&info->ops[6], "har");
+#if !defined(__APPLE__)
+  tensorflow::io::chfs::ProvideFilesystemSupportFor(&info>iops[7], "chfs");
+#endif
 }
