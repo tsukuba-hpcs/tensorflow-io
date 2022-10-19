@@ -22,6 +22,31 @@ namespace tf_read_only_memory_region {
 // Implementation for `TF_Filesystem`
 //
 namespace tf_chfs_filesystem {
+
+void atexit_handler(void); // forward declaration
+
+static TF_Filesystem* chfs_filesystem;
+
+void Init(TF_Filesystem* filesystem, TF_Status* status) {
+  filesystem->plugin_filesystem = new (std::nothrow) CHFS;
+
+  if (TF_GetCode(status) == TF_OK) {
+    chfs_filesystem = filesystem;
+    // explicitly calling Clear from atexist handlerhandlerhandlerhandler
+    // see: https://github.com/tensorflow/tensorflow/issues/27535
+    std::atexit(atexit_handler);
+  }
+}
+
+void Cleanup(TF_Filesystem* filesystem) {
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  delete chfs;
+}
+
+void atexit_handler(void) {
+  // terminate chfs_filesystem
+  Cleanup(chfs_filesystem);
+}
 } // namespace tf_chfs_filesystem
 
 void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
