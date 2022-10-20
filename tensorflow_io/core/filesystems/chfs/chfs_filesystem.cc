@@ -152,7 +152,7 @@ int64_t Tell(const TF_WritableFile* file, TF_Status* status) {
   off_t cur_position;
   auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
 
-  cur_position = chfs_seek(chfs_file->fd, 0L, SEEK_CUR);
+  cur_position = chfs_seek(chfs_file->fd, 0, SEEK_CUR);
 
   TF_SetStatus(status, TF_OK, "");
   return cur_position;
@@ -161,7 +161,7 @@ int64_t Tell(const TF_WritableFile* file, TF_Status* status) {
 void Close(const TF_WritableFile* file, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
-  chfs_file->chfs->Close(chfs_file->fd, status)
+  chfs_file->chfs->Close(chfs_file->fd, status);
 }
 
 } // namespace tf_writable_file
@@ -276,7 +276,7 @@ static void RecursivelyCreateDir(const TF_Filesystem* filesystem, const char* pa
 }
 
 static void DeleteFile(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-  TF_Status(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
   bool is_dir = false;
 
@@ -284,7 +284,7 @@ static void DeleteFile(const TF_Filesystem* filesystem, const char* path, TF_Sta
 }
 
 static void DeleteDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-  TF_Status(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
   bool is_dir = true;
 
@@ -302,13 +302,13 @@ static void RenameFile(const TF_Filesystem* filesystem, const char* src, const c
 }
 
 static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-  TF_Status(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
         tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
-  rc = chfs->Stat(path, st.get(), status);
+  rc = chfs->Stat(path, st, status);
   if (rc == ENOENT) {
     TF_SetStatus(status, TF_NOT_FOUND, "");
     return;
@@ -320,16 +320,16 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
 }
 
 static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-  TF_Status(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
         tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
-  rc = chfs->Stat(path, st.get(), status);
+  rc = chfs->Stat(path, st, status);
   if (rc == ENOENT) {
     TF_SetStatus(status, TF_NOT_FOUND, "");
-    return;
+    return false;
   }
 
   if (chfs->IsDir(st)) {
@@ -339,13 +339,14 @@ static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* 
 }
 
 static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-  const char* path_str = path.c_str();
   size_t file_size;
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
       tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
-  rc = chfs_stat(path_str, st.get());
+  struct stat* st_ptr = st.get();
+  rc = chfs_stat(path, st_ptr);
   if (rc != 0) {
     TF_SetStatus(status, TF_INTERNAL, "");
     return rc;

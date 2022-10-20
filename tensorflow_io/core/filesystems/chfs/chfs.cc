@@ -40,7 +40,7 @@ void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* 
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
         tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
 
-  rc = Stat(path, st.get(), status);
+  rc = Stat(path, st, status);
   if (rc != 0) {
     if (rc == ENOENT) {
       TF_SetStatus(status, TF_NOT_FOUND, "");
@@ -104,7 +104,8 @@ int CHFS::Stat(const std::string path, std::shared_ptr<struct stat> st, TF_Statu
     return -1;
   }
 
-  rc = chfs_stat(path_str, st.get());
+  struct stat* st_ptr = st.get();
+  rc = chfs_stat(path_str, st_ptr);
   return rc;
 }
 
@@ -135,7 +136,7 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
     tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
 
-  rc = Stat(path, st.get(), status);
+  rc = Stat(path, st, status);
   if (rc != 0) {
     if (IsDir(st)) {
       TF_SetStatus(status, TF_ALREADY_EXISTS, "");
@@ -149,7 +150,7 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
   }
 
   TF_SetStatus(status, TF_OK, "");
-  rc = chfs_mkdir(path_str, S_IWUSR | S_IRUSR | S_IXUSR);$A
+  rc = chfs_mkdir(path_str, S_IWUSR | S_IRUSR | S_IXUSR);
   if (rc) {
     TF_SetStatus(status, TF_INTERNAL, "Error creating directory");
   }
@@ -157,14 +158,14 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
   return rc;
 }
 
-int DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
-  TF_Status(status, TF_OK, "");
+int CHFS::DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
   int rc;
   const char* path_str = path.c_str();
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
         tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
 
-  rc = Stat(path, st.get(), status);
+  rc = Stat(path, st, status);
   if (rc != 0) {
     if (IsDir(st)) {
       if (!is_dir) {
