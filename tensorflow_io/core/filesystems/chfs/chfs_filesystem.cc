@@ -1,4 +1,6 @@
-
+#include "tensorflow_io/core/filesystems/chfs/chfs.h"
+#undef NDEBUG
+#include <cassert>
 
 namespace tensorflow{
 namespace io {
@@ -10,15 +12,16 @@ namespace tf_random_access_file {
 typedef struct CHFSRandomAccessFile {
   CHFS* chfs;
   std::string path;
-  int fd;
   size_t file_size;
-  bool size_known;
+  int fd;
 
   CHFSRandomAccessFile(CHFS* chfs, std::string path, int fd) 
     : chfs(chfs), path(path), fd(fd) {
-      size_known = false;
-      size_t dummy;
-      get_file_size(dummy);
+    const char* path_str = path.c_str();
+    std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+    chfs_stat(path_str, st.get());
+    file_size = static_cast<size_t>(st->st_size);
   }
 
   int64_t Read(uint64_t offset, size_t n, char* buffer, TF_Status* status) {
@@ -30,7 +33,7 @@ typedef struct CHFSRandomAccessFile {
       return read_size;
     }
 
-    if (read_size != n) {
+    if (static_cast<size_t>(read_size) != n) {
       TF_SetStatus(status, TF_OUT_OF_RANGE, "");
       return read_size;
     }
@@ -39,7 +42,6 @@ typedef struct CHFSRandomAccessFile {
     return read_size;
   }
 } CHFSRandomAccessFile;
-} // namespace tf_random_access_file
 
 void Cleanup(TF_RandomAccessFile* file) {
   auto chfs_file = static_cast<CHFSRandomAccessFile*>(file->plugin_file);
@@ -71,6 +73,7 @@ int64_t Read(const TF_RandomAccessFile* file, uint64_t offset, size_t n, char* r
   }
   return total_bytes;
 }
+} // namespace tf_random_access_file
 
 // Implementation for `TF_WritableFile`
 //
@@ -93,9 +96,10 @@ typedef struct CHFSWritableFile {
     int rc;
 
     if (size_known) {
+      const char* path_str = path.c_str();
       std::shared_ptr<struct stat> st(static_cast<struct stat*>(
           tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
-      rc = chfs_stat(path, st);
+      rc = chfs_stat(path_str, st.get());
       if (rc != 0) {
         return rc;
       }
@@ -125,7 +129,8 @@ void Cleanup(TF_WritableFile* file) {
 void Append(const TF_WritableFile* file, const char* buffer, size_t n, TF_Status* status) {
 }
 
-uint64_t Tell(const TF_WritableFile* file, TF_Status* status) {
+int64_t Tell(const TF_WritableFile* file, TF_Status* status) {
+    return 0;
 }
 
 void Close(const TF_WritableFile* file, TF_Status* status) {
@@ -152,7 +157,8 @@ void atexit_handler(void); // forward declaration
 static TF_Filesystem* chfs_filesystem;
 
 void Init(TF_Filesystem* filesystem, TF_Status* status) {
-  filesystem->plugin_filesystem = new (std::nothrow) CHFS;
+  const char* server = std::getenv("CHFS_SERVER");
+  filesystem->plugin_filesystem = new (std::nothrow) CHFS(server, status);
 
   if (TF_GetCode(status) == TF_OK) {
     chfs_filesystem = filesystem;
@@ -189,11 +195,11 @@ void NewWritableFile(const TF_Filesystem* filesystem, const char* path,
   if (TF_GetCode(status) != TF_OK)
     return;
 
-  fd = chfs->Open(path, status);
+  fd = chfs->Open(path, O_RDWR, status);
   if (TF_GetCode(status) != TF_OK)
     return;
 
-  file->plugin_file = new tf_writable_file::CHFSWritableFile(path, fd);
+  file->plugin_file = new tf_writable_file::CHFSWritableFile(chfs, path, fd);
 }
 
 void NewRandomAccessFile(const TF_Filesystem* filesystem, const char* path,
@@ -206,7 +212,7 @@ void NewRandomAccessFile(const TF_Filesystem* filesystem, const char* path,
   if (TF_GetCode(status) != TF_OK)
     return;
 
-  fd = chfs->Open(path, status);
+  fd = chfs->Open(path, O_RDWR, status);
   if (TF_GetCode(status) != TF_OK)
     return;
 
@@ -223,11 +229,11 @@ void NewAppendableFile(const TF_Filesystem* filesystem, const char* path,
   if (TF_GetCode(status) != TF_OK)
     return;
 
-  fd = chfs->Open(path, status);
+  fd = chfs->Open(path, O_RDWR, status);
   if (TF_GetCode(status) != TF_OK)
     return;
 
-  file->plugin_file = new tf_appendable_file::CHFSAppendableFile(chfs, path, fd);
+  file->plugin_file = new tf_writable_file::CHFSWritableFile(chfs, path, fd);
 }
 
 static void CreateDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
@@ -254,20 +260,24 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Sta
 }
 
 static void Stat(const TF_Filesystem* filesystem, const char* path,
-                 TF_FileStatistics* status, TF_Status* status) {
+                 TF_FileStatistics* stats, TF_Status* status) {
 }
 
 static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+    return true;
 }
 
 static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+    return 0L;
 }
 
 static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
+    return NULL;
 }
 
 static int GetChildren(const TF_Filesystem* filesystem, const char* path,
                        char*** entries, TF_Status* status) {
+    return 0;
 }
 
 } // namespace tf_chfs_filesystem
@@ -286,8 +296,6 @@ void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
   ops->writable_file_ops->cleanup = tf_writable_file::Cleanup;
   ops->writable_file_ops->append = tf_writable_file::Append;
   ops->writable_file_ops->tell = tf_writable_file::Tell;
-  ops->writable_file_ops->flush = tf_writable_file::Flush;
-  ops->writable_file_ops->sync = tf_writable_file::Sync;
   ops->writable_file_ops->close = tf_writable_file::Close;
 
   ops->read_only_memory_region_ops = static_cast<TF_ReadOnlyMemoryRegionOps*>(
@@ -303,17 +311,17 @@ void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
   ops->filesystem_ops->cleanup = tf_chfs_filesystem::Cleanup;
   ops->filesystem_ops->new_random_access_file =
       tf_chfs_filesystem::NewRandomAccessFile;
-  ops->filesystem_ops->new_writable_file = tf_dfs_filesystem::NewWritableFile;
+  ops->filesystem_ops->new_writable_file = tf_chfs_filesystem::NewWritableFile;
   ops->filesystem_ops->new_appendable_file =
       tf_chfs_filesystem::NewAppendableFile;
   ops->filesystem_ops->path_exists = tf_chfs_filesystem::PathExists;
   ops->filesystem_ops->create_dir = tf_chfs_filesystem::CreateDir;
-  ops->filesystem_ops->delete_dir = tf_chfs_filesystem::DeleteSingleDir;
+  ops->filesystem_ops->delete_dir = tf_chfs_filesystem::DeleteDir;
   ops->filesystem_ops->recursively_create_dir =
       tf_chfs_filesystem::RecursivelyCreateDir;
   ops->filesystem_ops->is_directory = tf_chfs_filesystem::IsDir;
   ops->filesystem_ops->delete_recursively =
-      tf_chfs_filesystem::RecursivelyDeleteDir;
+      tf_chfs_filesystem::DeleteRecursively;
   ops->filesystem_ops->get_file_size = tf_chfs_filesystem::GetFileSize;
   ops->filesystem_ops->delete_file = tf_chfs_filesystem::DeleteFile;
   ops->filesystem_ops->rename_file = tf_chfs_filesystem::RenameFile;

@@ -3,7 +3,7 @@
 // #undef NDEBUG
 #include <cassert>
 
-CHFS::CHFS(TF_Status* status, const std::string server) {
+CHFS::CHFS(const char* server, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
 
@@ -15,10 +15,7 @@ CHFS::CHFS(TF_Status* status, const std::string server) {
 }
 
 CHFS::~CHFS() {
-  int rc;
-
-  rc = chfs_term();
-  assert(rc == 0);
+  chfs_term();
 }
 
 mode_t getFlag(FileMode mode) {
@@ -39,13 +36,14 @@ mode_t getFlag(FileMode mode) {
 void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* status) {
   int rc;
   mode_t m_mode;
+  const char* path_str = path.c_str();
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
         tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
 
-  rc = Stat(path, st, status);
+  rc = Stat(path, st.get(), status);
   if (rc != 0) {
     if (rc == ENOENT) {
-      TF_SetStatus(status, TF_NOT_FOUNT, "");
+      TF_SetStatus(status, TF_NOT_FOUND, "");
     } else {
       TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
     }
@@ -53,18 +51,16 @@ void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* 
   }
 
   if (!IsDir(st)) {
-    if (!is_dir) {
-      TF_SetStatus(status, TF_FAiled_PRECONDITION, "path is a directory");
-      return;
-    }
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "path is a directory");
+    return;
   }
 
   if (IsFile(st) && mode == READ) {
     return;
   }
 
-  m_mode = getFlag(mode)
-  rc = chfs_create(path, flags, m_mode);
+  m_mode = getFlag(mode);
+  rc = chfs_create(path_str, flags, m_mode);
   if (rc) {
     TF_SetStatus(status, TF_INTERNAL, "Error Creating Writable File");
     return;
@@ -73,13 +69,14 @@ void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* 
 }
 
 int CHFS::Open(const std::string path, int flags, TF_Status* status) {
-  TF_SetStat(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   int fd;
+  const char* path_str = path.c_str();
 
-  fd = chfs_open(path, flags);
+  fd = chfs_open(path_str, flags);
   if (fd < 0) {
     if (fd == ENOENT) {
-      TF_SetStatus(status, TF_NOT_FOUNT, "");
+      TF_SetStatus(status, TF_NOT_FOUND, "");
     } else {
       TF_SetStatus(status, TF_FAILED_PRECONDITION, "Erorr openning a file");
     }
@@ -87,32 +84,33 @@ int CHFS::Open(const std::string path, int flags, TF_Status* status) {
   return fd;
 }
 
-void CHFS::Close(int fd) {
-  TF_SetStat(status, TF_OK, "");
+void CHFS::Close(int fd, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
   int rc;
 
   rc = chfs_close(fd);
   if (rc) {
-    TF_SetStat(status, TF_FAILED_PRECONDITION, "Error closing a file");
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error closing a file");
   }
 }
 
 int CHFS::Stat(const std::string path, struct stat *st, TF_Status* status) {
-  TF_SetStat(status, TF_OK, "");
+  TF_SetStatus(status, TF_OK, "");
   int rc;
+  const char* path_str = path.c_str();
 
   if (st == NULL) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on stat file");
     return -1;
   }
 
-  rc = chfs_stat(path, st);
+  rc = chfs_stat(path_str, st);
   return rc;
 }
 
-int CHFS::IsDir(struct stat* st) {
+int CHFS::IsDir(std::shared_ptr<struct stat> st) {
   if (st == NULL) {
-    return false
+    return false;
   }
   if (S_ISDIR(st->st_mode)) {
     return true;
@@ -120,7 +118,7 @@ int CHFS::IsDir(struct stat* st) {
   return false;
 }
 
-int CHFS::IsFile(struct stat* st) {
+int CHFS::IsFile(std::shared_ptr<struct stat> st) {
   if (st == NULL) {
     return false;
   }
