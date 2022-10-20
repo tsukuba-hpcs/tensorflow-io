@@ -43,7 +43,7 @@ cc_library(
         "@bazel_tools//src/conditions:windows": [],
         "@bazel_tools//src/conditions:darwin": [],
         "//conditions:default": [
-          "//tensorflow/core/filesystems/chfs",
+          "//tensorflow_io/core/filesystems/chfs",
         ],
     }),
     alwayslink = 1,

@@ -291,6 +291,16 @@ http_archive(
 )
 
 http_archive(
+    name = "chfs",
+    build_file = "//third_party:chfs.BUILD",
+    sha256 = "315295bf10b3b3fb93620791e844c540f6f238b4eab6a5c56825c6b7896737a2",
+    strip_prefix = "chfs-1.0.0",
+    urls = [
+        "https://github.com/otatebe/chfs/archive/refs/tags/1.0.0.tar.gz"
+    ],
+)
+
+http_archive(
     name = "dav1d",
     build_file = "//third_party:dav1d.BUILD",
     patch_cmds = [
