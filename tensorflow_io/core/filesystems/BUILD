@@ -39,6 +39,12 @@ cc_library(
         "//tensorflow_io/core/filesystems/hdfs",
         "//tensorflow_io/core/filesystems/http",
         "//tensorflow_io/core/filesystems/s3",
-    ],
+    ] + select({
+        "@bazel_tools//src/conditions:windows": [],
+        "@bazel_tools//src/conditions:darwin": [],
+        "//conditions:default": [
+          "//tensorflow/core/filesystems/chfs",
+        ],
+    }),
     alwayslink = 1,
 )
