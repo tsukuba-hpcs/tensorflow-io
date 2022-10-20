@@ -8,6 +8,7 @@
 #include <vector>
 #include <memory>
 #include <cstring>
+#include <filesystem>
 
 #include <chfs.h>
 #include <sys/stat.h>
@@ -23,7 +24,7 @@ class CHFS {
 
     void NewFile(const std::string path, FileMode mode, int flags, TF_Status* status);
 
-    int CreateDir(const std::string path, bool is_dir, bool recursive, TF_Status* status);
+    int CreateDir(const std::string path, TF_Status* status);
 
     int Open(const std::string path, int flags, TF_Status* status);
 
@@ -36,6 +37,8 @@ class CHFS {
     int IsFile(std::shared_ptr<struct stat> st);
 
     int ReadDir(const std::string path, std::vector<std::string>& child);
+
+    int DeleteEntry(const std::string path, bool is_dir, TF_Status* status);
 
     ~CHFS();
 };

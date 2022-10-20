@@ -127,13 +127,41 @@ void Cleanup(TF_WritableFile* file) {
 }
 
 void Append(const TF_WritableFile* file, const char* buffer, size_t n, TF_Status* status) {
+  int rc;
+  auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
+
+  size_t cur_file_size;
+  rc = chfs_file->get_file_size(cur_file_size);
+  if (rc != 0) {
+    TF_SetStatus(status, TF_INTERNAL, "Cannot determine file size");
+    return;
+  }
+
+  rc = chfs_pwrite(chfs_file->fd, buffer, n, cur_file_size);
+  if (rc) {
+    TF_SetStatus(status, TF_RESOURCE_EXHAUSTED, "");
+    chfs_file->unset_file_size();
+    return;
+  }
+
+  chfs_file->set_file_size(cur_file_size + n);
+  TF_SetStatus(status, TF_OK, "");
 }
 
 int64_t Tell(const TF_WritableFile* file, TF_Status* status) {
-    return 0;
+  off_t cur_position;
+  auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
+
+  cur_position = chfs_seek(chfs_file->fd, 0L, SEEK_CUR);
+
+  TF_SetStatus(status, TF_OK, "");
+  return cur_position;
 }
 
 void Close(const TF_WritableFile* file, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
+  chfs_file->chfs->Close(chfs_file->fd, status)
 }
 
 } // namespace tf_writable_file
@@ -237,26 +265,54 @@ void NewAppendableFile(const TF_Filesystem* filesystem, const char* path,
 }
 
 static void CreateDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+
+  chfs->CreateDir(path, status);
 }
 
 static void RecursivelyCreateDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status){
+  // unimplemented
 }
 
 static void DeleteFile(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+  TF_Status(status, TF_OK, "");
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  bool is_dir = false;
+
+  chfs->DeleteEntry(path, is_dir, status);
 }
 
 static void DeleteDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+  TF_Status(status, TF_OK, "");
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  bool is_dir = true;
+
+  chfs->DeleteEntry(path, is_dir, status);
 }
 
 static void DeleteRecursively(const TF_Filesystem* filesystem, const char* path,
                        uint64_t* undeleted_files,
                        uint64_t* undeleted_dirs, TF_Status* status) {
+  // unimplemented
 }
 
 static void RenameFile(const TF_Filesystem* filesystem, const char* src, const char* dst, TF_Status* status) {
+  // unimplemented
 }
 
 static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+  TF_Status(status, TF_OK, "");
+  int rc;
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+
+  rc = chfs->Stat(path, st.get(), status);
+  if (rc == ENOENT) {
+    TF_SetStatus(status, TF_NOT_FOUND, "");
+    return;
+  }
 }
 
 static void Stat(const TF_Filesystem* filesystem, const char* path,
@@ -264,15 +320,45 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
 }
 
 static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+  TF_Status(status, TF_OK, "");
+  int rc;
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+
+  rc = chfs->Stat(path, st.get(), status);
+  if (rc == ENOENT) {
+    TF_SetStatus(status, TF_NOT_FOUND, "");
+    return;
+  }
+
+  if (chfs->IsDir(st)) {
     return true;
+  }
+  return false;
 }
 
 static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
-    return 0L;
+  const char* path_str = path.c_str();
+  size_t file_size;
+  int rc;
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+
+  rc = chfs_stat(path_str, st.get());
+  if (rc != 0) {
+    TF_SetStatus(status, TF_INTERNAL, "");
+    return rc;
+  }
+  if (chfs->IsDir(st)) {
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+    return -1;
+  }
+  file_size = static_cast<size_t>(st->st_size);
 }
 
 static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
-    return NULL;
+  return strdup(uri);
 }
 
 static int GetChildren(const TF_Filesystem* filesystem, const char* path,

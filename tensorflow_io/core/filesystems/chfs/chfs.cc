@@ -127,3 +127,65 @@ int CHFS::IsFile(std::shared_ptr<struct stat> st) {
   }
   return false;
 }
+
+int CHFS::CreateDir(const std::string path, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  int rc;
+  const char* path_str = path.c_str();
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+    tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+
+  rc = Stat(path, st.get(), status);
+  if (rc != 0) {
+    if (IsDir(st)) {
+      TF_SetStatus(status, TF_ALREADY_EXISTS, "");
+      return 0;
+    } else {
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+      return -1;
+    }
+  } else if (TF_GetCode(status) != TF_NOT_FOUND) {
+    return -1;
+  }
+
+  TF_SetStatus(status, TF_OK, "");
+  rc = chfs_mkdir(path_str, S_IWUSR | S_IRUSR | S_IXUSR);$A
+  if (rc) {
+    TF_SetStatus(status, TF_INTERNAL, "Error creating directory");
+  }
+
+  return rc;
+}
+
+int DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
+  TF_Status(status, TF_OK, "");
+  int rc;
+  const char* path_str = path.c_str();
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+
+  rc = Stat(path, st.get(), status);
+  if (rc != 0) {
+    if (IsDir(st)) {
+      if (!is_dir) {
+        TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a directory");
+        return -1;
+      }
+      rc = chfs_rmdir(path_str);
+      if (rc < 0) {
+        TF_SetStatus(status, TF_INTERNAL, "Error removing a directory");
+        return -1;
+      }
+    } else {
+      if (is_dir) {
+        TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a file");
+        return -1;
+      }
+      rc = chfs_unlink(path_str);
+      if (rc < 0) {
+        TF_SetStatus(status, TF_INTERNAL, "Error removing a file");
+        return -1;
+      }
+    }
+  }
+}
