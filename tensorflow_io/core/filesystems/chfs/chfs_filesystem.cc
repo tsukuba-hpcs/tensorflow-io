@@ -116,11 +116,31 @@ typedef struct CHFSWritableFile {
   }
 } CHFSWritableFile;
 
+void Cleanup(TF_WritableFile* file) {
+    auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
+    chfs_file->chfs = nullptr;
+    delete chfs_file;
+}
+
+void Append(const TF_WritableFile* file, const char* buffer, size_t n, TF_Status* status) {
+}
+
+uint64_t Tell(const TF_WritableFile* file, TF_Status* status) {
+}
+
+void Close(const TF_WritableFile* file, TF_Status* status) {
+}
+
 } // namespace tf_writable_file
 
 // Implementation for `TF_ReadOnlyMemoryRegion`
 //
 namespace tf_read_only_memory_region {
+void Cleanup(TF_ReadOnlyMemoryRegion* region) {}
+
+const void* Data(const TF_ReadOnlyMemoryRegion* region) { return nullptr; }
+
+uint64_t Length(const TF_ReadOnlyMemoryRegion* region) { return 0; }
 } // namespace tf_read_only_memory_region
 
 // Implementation for `TF_Filesystem`
@@ -209,6 +229,47 @@ void NewAppendableFile(const TF_Filesystem* filesystem, const char* path,
 
   file->plugin_file = new tf_appendable_file::CHFSAppendableFile(chfs, path, fd);
 }
+
+static void CreateDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static void RecursivelyCreateDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status){
+}
+
+static void DeleteFile(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static void DeleteDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static void DeleteRecursively(const TF_Filesystem* filesystem, const char* path,
+                       uint64_t* undeleted_files,
+                       uint64_t* undeleted_dirs, TF_Status* status) {
+}
+
+static void RenameFile(const TF_Filesystem* filesystem, const char* src, const char* dst, TF_Status* status) {
+}
+
+static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static void Stat(const TF_Filesystem* filesystem, const char* path,
+                 TF_FileStatistics* status, TF_Status* status) {
+}
+
+static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
+}
+
+static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
+}
+
+static int GetChildren(const TF_Filesystem* filesystem, const char* path,
+                       char*** entries, TF_Status* status) {
+}
+
 } // namespace tf_chfs_filesystem
 
 void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
@@ -259,7 +320,6 @@ void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
   ops->filesystem_ops->stat = tf_chfs_filesystem::Stat;
   ops->filesystem_ops->get_children = tf_chfs_filesystem::GetChildren;
   ops->filesystem_ops->translate_name = tf_chfs_filesystem::TranslateName;
-  ops->filesystem_ops->flush_caches = tf_chfs_filesystem::FlushCaches;
 }
 
 } // namespace chfs
