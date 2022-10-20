@@ -30,7 +30,7 @@ class CHFS {
 
     void Close(int fd, TF_Status* status);
 
-    int Stat(const std::string path, struct stat *st, TF_Status* status);
+    int Stat(const std::string path, std::shared_ptr<struct stat> st, TF_Status* status);
 
     int IsDir(std::shared_ptr<struct stat> st);
 

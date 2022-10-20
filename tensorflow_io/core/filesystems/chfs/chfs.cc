@@ -94,7 +94,7 @@ void CHFS::Close(int fd, TF_Status* status) {
   }
 }
 
-int CHFS::Stat(const std::string path, struct stat *st, TF_Status* status) {
+int CHFS::Stat(const std::string path, std::shared_ptr<struct stat> st, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
   const char* path_str = path.c_str();
@@ -104,7 +104,7 @@ int CHFS::Stat(const std::string path, struct stat *st, TF_Status* status) {
     return -1;
   }
 
-  rc = chfs_stat(path_str, st);
+  rc = chfs_stat(path_str, st.get());
   return rc;
 }
 
