@@ -317,6 +317,25 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Sta
 
 static void Stat(const TF_Filesystem* filesystem, const char* path,
                  TF_FileStatistics* stats, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  int rc;
+  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+
+  rc = chfs->Stat(path, st, status);
+  if (rc) {
+    TF_SetStatus(status, TF_INTERNAL, "");
+    return;
+  }
+
+  status->length = st.st_size;
+  status->mtime_sec = static_cast<int64_t>(st.st_mtime) * 1e9;
+  if (chfs->IsDirectory(st)) {
+    status->is_directory = true;
+  } else {
+    status->is_directory = false;
+  }
 }
 
 static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* status) {
