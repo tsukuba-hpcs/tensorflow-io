@@ -329,12 +329,12 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
     return;
   }
 
-  status->length = st.st_size;
-  status->mtime_sec = static_cast<int64_t>(st.st_mtime) * 1e9;
-  if (chfs->IsDirectory(st)) {
-    status->is_directory = true;
+  stats->length = st->st_size;
+  stats->mtime_nsec = static_cast<int64_t>(st->st_mtime) * 1e9;
+  if (chfs->IsDir(st)) {
+    stats->is_directory = true;
   } else {
-    status->is_directory = false;
+    stats->is_directory = false;
   }
 }
 
@@ -375,6 +375,7 @@ static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF
     return -1;
   }
   file_size = static_cast<size_t>(st->st_size);
+  return file_size;
 }
 
 static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
