@@ -293,10 +293,10 @@ http_archive(
 http_archive(
     name = "chfs",
     build_file = "//third_party:chfs.BUILD",
-    sha256 = "315295bf10b3b3fb93620791e844c540f6f238b4eab6a5c56825c6b7896737a2",
-    strip_prefix = "chfs-1.0.0",
+    sha256 = "61aa3600963bded220c28adc8be8bcb0e6dd2ef56f7fb596f4bdefcec37f73ae",
+    strip_prefix = "chfs-2.0.0",
     urls = [
-        "https://github.com/otatebe/chfs/archive/refs/tags/1.0.0.tar.gz"
+        "https://github.com/otatebe/chfs/archive/refs/tags/2.0.0.tar.gz"
     ],
 )
 
