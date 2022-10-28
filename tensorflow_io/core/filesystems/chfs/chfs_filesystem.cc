@@ -19,7 +19,8 @@ typedef struct CHFSRandomAccessFile {
     : chfs(chfs), path(path), fd(fd) {
     const char* path_str = path.c_str();
     std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+        tensorflow::io::plugin_memory_free);
     chfs_stat(path_str, st.get());
     file_size = static_cast<size_t>(st->st_size);
   }
@@ -98,8 +99,9 @@ typedef struct CHFSWritableFile {
     if (size_known) {
       const char* path_str = path.c_str();
       std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
-      rc = chfs_stat(path_str, st.get());
+          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+          tensorflow::io::plugin_memory_free);
+      rc = chfs->libchfs->chfs_stat(path_str, st.get());
       if (rc != 0) {
         return rc;
       }
@@ -137,7 +139,7 @@ void Append(const TF_WritableFile* file, const char* buffer, size_t n, TF_Status
     return;
   }
 
-  rc = chfs_pwrite(chfs_file->fd, buffer, n, cur_file_size);
+  rc = chfs_file->chfs->libchfs->chfs_pwrite(chfs_file->fd, buffer, n, cur_file_size);
   if (rc) {
     TF_SetStatus(status, TF_RESOURCE_EXHAUSTED, "");
     chfs_file->unset_file_size();
@@ -152,7 +154,7 @@ int64_t Tell(const TF_WritableFile* file, TF_Status* status) {
   off_t cur_position;
   auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
 
-  cur_position = chfs_seek(chfs_file->fd, 0, SEEK_CUR);
+  cur_position = chfs_file->chfs->libchfs->chfs_seek(chfs_file->fd, 0, SEEK_CUR);
 
   TF_SetStatus(status, TF_OK, "");
   return cur_position;
@@ -305,7 +307,8 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path, TF_Sta
   TF_SetStatus(status, TF_OK, "");
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+        tensorflow::io::plugin_memory_free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
@@ -320,7 +323,8 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
   TF_SetStatus(status, TF_OK, "");
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+        tensorflow::io::plugin_memory_free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
@@ -342,7 +346,8 @@ static bool IsDir(const TF_Filesystem* filesystem, const char* path, TF_Status* 
   TF_SetStatus(status, TF_OK, "");
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+        tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+        tensorflow::io::plugin_memory_free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
@@ -361,13 +366,12 @@ static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path, TF
   size_t file_size;
   int rc;
   std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))), free);
+      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+      tensorflow::io::plugin_memory_free);
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
-  struct stat* st_ptr = st.get();
-  rc = chfs_stat(path, st_ptr);
+  rc = chfs->Stat(path, st, status);
   if (rc != 0) {
-    TF_SetStatus(status, TF_INTERNAL, "");
     return rc;
   }
   if (chfs->IsDir(st)) {

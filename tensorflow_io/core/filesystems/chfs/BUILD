@@ -20,6 +20,8 @@ cc_library(
   linkstatic = True,
   deps = [
     "//tensorflow_io/core/filesystems:filesystem_plugins_header",
+    "@com_google_absl//absl/strings",
+    "@com_google_absl//absl/synchronization",
   ] + select({
     "@bazel_tools//src/conditions:windows": [],
     "@bazel_tools//src/conditions:darwin": [],
