@@ -43,67 +43,75 @@ mode_t getFlag(FileMode mode) {
   }
 }
 
-const std::string getPath(const std::string& path) {
+const std::string CHFS::GetPath(const std::string& path) {
   auto pos = path.find("://");
   if (pos != std::string::npos) return path.substr(pos + 3);
   return path;
 }
 
-const std::string getParent(const std::string& path) {
+const std::string CHFS::GetParent(const std::string& path) {
   std::filesystem::path p = path;
   return p.parent_path();
 }
 
-void CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
+int CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
                    TF_Status* status) {
-  int rc;
+  int rc, fd;
   mode_t m_mode;
-  const std::string cpath = getPath(path);
-  const std::string parent = getParent(cpath);
+  const std::string cpath = GetPath(path);
   std::shared_ptr<struct stat> st(
       static_cast<struct stat*>(
           tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
       tensorflow::io::plugin_memory_free);
 
-  rc = Stat(parent, st, status);
-  if (rc != 0) {
-    if (errno == ENOENT) {
-      TF_SetStatus(status, TF_NOT_FOUND, parent.c_str());
-    } else {
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on new file");
-    }
-    return;
+  rc = Stat(cpath, st, status);
+  if (rc != 0 && errno != ENOENT) {
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error stating the path");
+    return -1;
   }
 
-  if (!IsDir(st)) {
+  if (st != nullptr && IsDir(st)) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Path is a directory");
-    return;
+    return -1;
   }
 
   if (IsFile(st) && mode == READ) {
-    return;
+    fd = Open(path, flags, status);
+    if (fd < 0) {
+      TF_SetStatus(status, TF_INTERNAL, "Error opening a file");
+      return -1;
+    }
+    TF_SetStatus(status, TF_OK, "");
+    return fd;
+  }
+
+  const std::string parent = GetParent(cpath);
+  st.reset(static_cast<struct stat*>(
+      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+      tensorflow::io::plugin_memory_free);
+  rc = Stat(parent, st, status);
+  if (rc != 0) {
+      TF_SetStatus(status, TF_INTERNAL, "Cannot retrieve mode from parent");
+      return -1;
+  }
+  if (st != nullptr && !IsDir(st)) {
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "parent is not a directory");
+      return -1;
   }
 
   m_mode = getFlag(mode);
-  rc = libchfs->chfs_create(cpath.c_str(), m_mode, flags);
-  if (rc) {
-    std::stringstream mode_ss, flags_ss;
-    mode_ss << std::hex << m_mode;
-    flags_ss << std::hex << flags;
-    const std::string errmsg =
-        "Error Creating Writable File: " + std::string(strerror(errno)) + " (" +
-        cpath + ")" + " [ mode: " + mode_ss.str() +
-        " | flags: " + flags_ss.str() + " ]";
-    TF_SetStatus(status, TF_INTERNAL, errmsg.c_str());
-    return;
+  fd = libchfs->chfs_create(cpath.c_str(), m_mode, flags);
+  if (fd < 0) {
+    TF_SetStatus(status, TF_INTERNAL, "Error creating writable file");
+    return -1;
   }
-  return;
+  return fd;
 }
 
 int CHFS::Open(const std::string path, int32_t flags, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int fd;
-  std::string cpath = getPath(path);
+  std::string cpath = GetPath(path);
 
   fd = libchfs->chfs_open(cpath.c_str(), flags);
   if (fd < 0) {
@@ -130,7 +138,7 @@ int CHFS::Stat(const std::string path, std::shared_ptr<struct stat>& st,
                TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const char* path_str = getPath(path).c_str();
+  const char* path_str = GetPath(path).c_str();
 
   if (st == NULL) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on stat file");
@@ -196,7 +204,7 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
 int CHFS::DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const std::string cpath = getPath(path);
+  const std::string cpath = GetPath(path);
   std::shared_ptr<struct stat> st(
       static_cast<struct stat*>(
           tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),

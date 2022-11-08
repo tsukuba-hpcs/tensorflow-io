@@ -39,6 +39,19 @@ class CHFSTest(tf.test.TestCase):
 
         self.assertTrue(not tf.io.gfile.exists(file_name))
 
+    def test_write_read_file(self):
+        """Test write/read file"""
+        file_name = self._path_to("test_write_read")
+        if tf.io.gfile.exists(file_name):
+            tf.io.gfile.remove(file_name)
+
+        with tf.io.gfile.GFile(file_name, "w") as write_file:
+            write_file.write("Hello,\nworld!")
+
+        with tf.io.gfile.GFile(file_name, "r") as read_file:
+            data = read_file.read()
+            self.assertEqual(data, "Hello,\nworld!")
+
 
 if __name__ == "__main__":
     tf.test.main()

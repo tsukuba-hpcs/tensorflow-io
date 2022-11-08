@@ -1,6 +1,8 @@
 #include "tensorflow_io/core/filesystems/chfs/chfs.h"
-#undef NDEBUG
+// #undef NDEBUG
 #include <cassert>
+
+#include <iostream>
 
 namespace tensorflow {
 namespace io {
@@ -16,13 +18,13 @@ typedef struct CHFSRandomAccessFile {
   int fd;
 
   CHFSRandomAccessFile(CHFS* chfs, std::string path, int fd)
-      : chfs(chfs), path(path), fd(fd) {
-    const char* path_str = path.c_str();
+      : chfs(chfs), fd(fd) {
+    path = chfs->GetPath(path);
     std::shared_ptr<struct stat> st(
         static_cast<struct stat*>(
             tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
         tensorflow::io::plugin_memory_free);
-    chfs->libchfs->chfs_stat(path_str, st.get());
+    chfs->libchfs->chfs_stat(path.c_str(), st.get());
     file_size = static_cast<size_t>(st->st_size);
   }
 
@@ -89,7 +91,8 @@ typedef struct CHFSWritableFile {
   bool size_known;
 
   CHFSWritableFile(CHFS* chfs, std::string path, int fd)
-      : chfs(chfs), path(path), fd(fd) {
+      : chfs(chfs), fd(fd) {
+    path = chfs->GetPath(path);
     size_known = false;
     size_t dummy;
     get_file_size(dummy);
@@ -98,13 +101,12 @@ typedef struct CHFSWritableFile {
   int get_file_size(size_t& size) {
     int rc;
 
-    if (size_known) {
-      const char* path_str = path.c_str();
+    if (!size_known) {
       std::shared_ptr<struct stat> st(
           static_cast<struct stat*>(
               tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
           tensorflow::io::plugin_memory_free);
-      rc = chfs->libchfs->chfs_stat(path_str, st.get());
+      rc = chfs->libchfs->chfs_stat(path.c_str(), st.get());
       if (rc) {
         return rc;
       }
@@ -112,7 +114,7 @@ typedef struct CHFSWritableFile {
       size_known = true;
     }
     size = file_size;
-    return rc;
+    return 0;
   }
 
   void set_file_size(size_t size) {
@@ -132,24 +134,25 @@ void Cleanup(TF_WritableFile* file) {
 void Append(const TF_WritableFile* file, const char* buffer, size_t n,
             TF_Status* status) {
   int rc;
+  ssize_t written_bytes;
+  size_t cur_file_size;
   auto chfs_file = static_cast<CHFSWritableFile*>(file->plugin_file);
 
-  size_t cur_file_size;
   rc = chfs_file->get_file_size(cur_file_size);
   if (rc != 0) {
     TF_SetStatus(status, TF_INTERNAL, "Cannot determine file size");
     return;
   }
 
-  rc = chfs_file->chfs->libchfs->chfs_pwrite(chfs_file->fd, buffer, n,
+  written_bytes = chfs_file->chfs->libchfs->chfs_pwrite(chfs_file->fd, buffer, n,
                                              cur_file_size);
-  if (rc) {
+  if (written_bytes < 0) {
     TF_SetStatus(status, TF_RESOURCE_EXHAUSTED, strerror(errno));
     chfs_file->unset_file_size();
     return;
   }
 
-  chfs_file->set_file_size(cur_file_size + n);
+  chfs_file->set_file_size(cur_file_size + written_bytes);
   TF_SetStatus(status, TF_OK, "");
 }
 
@@ -212,23 +215,14 @@ void atexit_handler(void) {
   Cleanup(chfs_filesystem);
 }
 
-void NewFile(const TF_Filesystem* filesystem, const char* path, FileMode mode,
-             int32_t flags, TF_Status* status) {
-  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
-
-  chfs->NewFile(path, mode, flags, status);
-}
-
 void NewWritableFile(const TF_Filesystem* filesystem, const char* path,
                      TF_WritableFile* file, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  int32_t flags = S_IRUSR | S_IWUSR | S_IFREG;
   int fd;
 
-  NewFile(filesystem, path, WRITE, 0600, status);
-  if (TF_GetCode(status) != TF_OK) return;
-
-  fd = chfs->Open(path, O_RDWR, status);
+  fd = chfs->NewFile(path, WRITE, flags, status);
   if (TF_GetCode(status) != TF_OK) return;
 
   file->plugin_file = new tf_writable_file::CHFSWritableFile(chfs, path, fd);
@@ -238,12 +232,10 @@ void NewRandomAccessFile(const TF_Filesystem* filesystem, const char* path,
                          TF_RandomAccessFile* file, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  int32_t flags = S_IRUSR | S_IFREG;
   int fd;
 
-  NewFile(filesystem, path, READ, S_IRUSR | S_IFREG, status);
-  if (TF_GetCode(status) != TF_OK) return;
-
-  fd = chfs->Open(path, O_RDWR, status);
+  fd = chfs->NewFile(path, READ, flags, status);
   if (TF_GetCode(status) != TF_OK) return;
 
   file->plugin_file =
@@ -254,12 +246,10 @@ void NewAppendableFile(const TF_Filesystem* filesystem, const char* path,
                        TF_WritableFile* file, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+  int32_t flags = S_IRUSR | S_IWUSR | S_IFREG;
   int fd;
 
-  NewFile(filesystem, path, APPEND, S_IRUSR | S_IWUSR | S_IFREG, status);
-  if (TF_GetCode(status) != TF_OK) return;
-
-  fd = chfs->Open(path, O_RDWR, status);
+  fd = chfs->NewFile(path, APPEND, flags, status);
   if (TF_GetCode(status) != TF_OK) return;
 
   file->plugin_file = new tf_writable_file::CHFSWritableFile(chfs, path, fd);
@@ -318,7 +308,7 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path,
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
-  if (rc != 0) {
+  if (rc) {
     if (TF_GetCode(status) == TF_OK && errno == ENOENT) {
       TF_SetStatus(status, TF_NOT_FOUND, "");
       return;

@@ -32,7 +32,11 @@ class CHFS {
 
   explicit CHFS(const char* server, TF_Status* status);
 
-  void NewFile(const std::string path, FileMode mode, int flags,
+  const std::string GetPath(const std::string& string);
+
+  const std::string GetParent(const std::string& string);
+
+  int NewFile(const std::string path, FileMode mode, int flags,
                TF_Status* status);
 
   int CreateDir(const std::string path, TF_Status* status);
