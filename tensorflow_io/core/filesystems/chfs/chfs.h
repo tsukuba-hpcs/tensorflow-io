@@ -1,10 +1,12 @@
-#ifndef TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
-#define TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
+#ifndef TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_H_
+#define TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_H_
 
-#include <chfs.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+// clang-format off
+#include <chfs.h>
+// clang-format on
 
 #include <cstring>
 #include <filesystem>
