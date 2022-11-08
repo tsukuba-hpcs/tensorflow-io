@@ -1,10 +1,10 @@
 #ifndef TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
 #define TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
 
-#include <chfs.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <chfs.h>
 
 #include <cstring>
 #include <filesystem>
