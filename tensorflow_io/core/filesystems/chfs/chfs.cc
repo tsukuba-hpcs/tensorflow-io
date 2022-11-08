@@ -55,7 +55,7 @@ const std::string CHFS::GetParent(const std::string& path) {
 }
 
 int CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
-                   TF_Status* status) {
+                  TF_Status* status) {
   int rc, fd;
   mode_t m_mode;
   const std::string cpath = GetPath(path);
@@ -87,16 +87,16 @@ int CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
 
   const std::string parent = GetParent(cpath);
   st.reset(static_cast<struct stat*>(
-      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
-      tensorflow::io::plugin_memory_free);
+               tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+           tensorflow::io::plugin_memory_free);
   rc = Stat(parent, st, status);
   if (rc != 0) {
-      TF_SetStatus(status, TF_INTERNAL, "Cannot retrieve mode from parent");
-      return -1;
+    TF_SetStatus(status, TF_INTERNAL, "Cannot retrieve mode from parent");
+    return -1;
   }
   if (st != nullptr && !IsDir(st)) {
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, "parent is not a directory");
-      return -1;
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "parent is not a directory");
+    return -1;
   }
 
   m_mode = getFlag(mode);

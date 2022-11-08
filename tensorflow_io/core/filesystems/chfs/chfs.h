@@ -1,10 +1,10 @@
 #ifndef TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
 #define TENSORFLOW_IO_CORE_FILESYTEM_CHFS_CHFS_FILESYSTEM_H_
 
+#include <chfs.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <chfs.h>
 
 #include <cstring>
 #include <filesystem>
@@ -37,7 +37,7 @@ class CHFS {
   const std::string GetParent(const std::string& string);
 
   int NewFile(const std::string path, FileMode mode, int flags,
-               TF_Status* status);
+              TF_Status* status);
 
   int CreateDir(const std::string path, TF_Status* status);
 

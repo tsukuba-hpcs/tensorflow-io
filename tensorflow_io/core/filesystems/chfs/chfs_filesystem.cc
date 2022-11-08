@@ -1,7 +1,6 @@
 #include "tensorflow_io/core/filesystems/chfs/chfs.h"
 // #undef NDEBUG
 #include <cassert>
-
 #include <iostream>
 
 namespace tensorflow {
@@ -90,8 +89,7 @@ typedef struct CHFSWritableFile {
   size_t file_size;
   bool size_known;
 
-  CHFSWritableFile(CHFS* chfs, std::string path, int fd)
-      : chfs(chfs), fd(fd) {
+  CHFSWritableFile(CHFS* chfs, std::string path, int fd) : chfs(chfs), fd(fd) {
     path = chfs->GetPath(path);
     size_known = false;
     size_t dummy;
@@ -144,8 +142,8 @@ void Append(const TF_WritableFile* file, const char* buffer, size_t n,
     return;
   }
 
-  written_bytes = chfs_file->chfs->libchfs->chfs_pwrite(chfs_file->fd, buffer, n,
-                                             cur_file_size);
+  written_bytes = chfs_file->chfs->libchfs->chfs_pwrite(chfs_file->fd, buffer,
+                                                        n, cur_file_size);
   if (written_bytes < 0) {
     TF_SetStatus(status, TF_RESOURCE_EXHAUSTED, strerror(errno));
     chfs_file->unset_file_size();
