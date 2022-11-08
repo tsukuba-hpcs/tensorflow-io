@@ -291,16 +291,6 @@ http_archive(
 )
 
 http_archive(
-    name = "chfs",
-    build_file = "//third_party:chfs.BUILD",
-    sha256 = "61aa3600963bded220c28adc8be8bcb0e6dd2ef56f7fb596f4bdefcec37f73ae",
-    strip_prefix = "chfs-2.0.0",
-    urls = [
-        "https://github.com/otatebe/chfs/archive/refs/tags/2.0.0.tar.gz"
-    ],
-)
-
-http_archive(
     name = "dav1d",
     build_file = "//third_party:dav1d.BUILD",
     patch_cmds = [
@@ -920,6 +910,19 @@ http_archive(
         "https://storage.googleapis.com/mirror.tensorflow.org/github.com/bazelbuild/bazel-gazelle/releases/download/0.18.2/bazel-gazelle-0.18.2.tar.gz",
         "https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.2/bazel-gazelle-0.18.2.tar.gz",
     ],
+)
+
+http_archive(
+    name = "bazel_pkg_config",
+    strip_prefix = "bazel_pkg_config-master",
+    urls = ["https://github.com/cherrry/bazel_pkg_config/archive/master.zip"],
+)
+
+load("//:pkg_config_repository.bzl", "pkg_config_repository")
+
+pkg_config_repository(
+    name = "chfs-lib",
+    packages = ["chfs"],
 )
 
 load("@io_bazel_rules_go//go:deps.bzl", "go_register_toolchains", "go_rules_dependencies")
