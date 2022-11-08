@@ -11,8 +11,8 @@ CHFS::CHFS(const char* server, TF_Status* status) {
 
   libchfs.reset(new libCHFS(status));
   if (TF_GetCode(status) != TF_OK) {
-      libchfs.reset(nullptr);
-      return;
+    libchfs.reset(nullptr);
+    return;
   }
 
   rc = libchfs->chfs_init(server);
@@ -31,38 +31,52 @@ CHFS::~CHFS() {
 mode_t getFlag(FileMode mode) {
   switch (mode) {
     case READ:
-      return O_RDONLY;
+      return (O_RDONLY);
     case WRITE:
-      return O_WRONLY | O_CREAT;
+      return (O_WRONLY | O_CREAT);
     case APPEND:
-      return O_WRONLY | O_APPEND | O_CREAT;
+      return (O_WRONLY | O_APPEND | O_CREAT);
     case READWRITE:
-      return O_RDWR | O_CREAT;
+      return (O_RDWR | O_CREAT);
     default:
       return -1;
   }
 }
 
-void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* status) {
+const std::string getPath(const std::string& path) {
+  auto pos = path.find("://");
+  if (pos != std::string::npos) return path.substr(pos + 3);
+  return path;
+}
+
+const std::string getParent(const std::string& path) {
+  std::filesystem::path p = path;
+  return p.parent_path();
+}
+
+void CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
+                   TF_Status* status) {
   int rc;
   mode_t m_mode;
-  const char* path_str = path.c_str();
-  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+  const std::string cpath = getPath(path);
+  const std::string parent = getParent(cpath);
+  std::shared_ptr<struct stat> st(
+      static_cast<struct stat*>(
+          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
       tensorflow::io::plugin_memory_free);
 
-  rc = Stat(path, st, status);
+  rc = Stat(parent, st, status);
   if (rc != 0) {
-    if (rc == ENOENT) {
-      TF_SetStatus(status, TF_NOT_FOUND, "");
+    if (errno == ENOENT) {
+      TF_SetStatus(status, TF_NOT_FOUND, parent.c_str());
     } else {
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on new file");
     }
     return;
   }
 
   if (!IsDir(st)) {
-    TF_SetStatus(status, TF_FAILED_PRECONDITION, "path is a directory");
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "Path is a directory");
     return;
   }
 
@@ -71,20 +85,27 @@ void CHFS::NewFile(const std::string path, FileMode mode, int flags, TF_Status* 
   }
 
   m_mode = getFlag(mode);
-  rc = libchfs->chfs_create(path_str, flags, m_mode);
+  rc = libchfs->chfs_create(cpath.c_str(), m_mode, flags);
   if (rc) {
-    TF_SetStatus(status, TF_INTERNAL, "Error Creating Writable File");
+    std::stringstream mode_ss, flags_ss;
+    mode_ss << std::hex << m_mode;
+    flags_ss << std::hex << flags;
+    const std::string errmsg =
+        "Error Creating Writable File: " + std::string(strerror(errno)) + " (" +
+        cpath + ")" + " [ mode: " + mode_ss.str() +
+        " | flags: " + flags_ss.str() + " ]";
+    TF_SetStatus(status, TF_INTERNAL, errmsg.c_str());
     return;
   }
   return;
 }
 
-int CHFS::Open(const std::string path, int flags, TF_Status* status) {
+int CHFS::Open(const std::string path, int32_t flags, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int fd;
-  const char* path_str = path.c_str();
+  std::string cpath = getPath(path);
 
-  fd = libchfs->chfs_open(path_str, flags);
+  fd = libchfs->chfs_open(cpath.c_str(), flags);
   if (fd < 0) {
     if (fd == ENOENT) {
       TF_SetStatus(status, TF_NOT_FOUND, "");
@@ -105,10 +126,11 @@ void CHFS::Close(int fd, TF_Status* status) {
   }
 }
 
-int CHFS::Stat(const std::string path, std::shared_ptr<struct stat> st, TF_Status* status) {
+int CHFS::Stat(const std::string path, std::shared_ptr<struct stat>& st,
+               TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const char* path_str = path.c_str();
+  const char* path_str = getPath(path).c_str();
 
   if (st == NULL) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on stat file");
@@ -120,8 +142,8 @@ int CHFS::Stat(const std::string path, std::shared_ptr<struct stat> st, TF_Statu
   return rc;
 }
 
-int CHFS::IsDir(std::shared_ptr<struct stat> st) {
-  if (st == NULL) {
+int CHFS::IsDir(std::shared_ptr<struct stat>& st) {
+  if (st == nullptr) {
     return false;
   }
   if (S_ISDIR(st->st_mode)) {
@@ -130,7 +152,7 @@ int CHFS::IsDir(std::shared_ptr<struct stat> st) {
   return false;
 }
 
-int CHFS::IsFile(std::shared_ptr<struct stat> st) {
+int CHFS::IsFile(std::shared_ptr<struct stat>& st) {
   if (st == NULL) {
     return false;
   }
@@ -144,8 +166,9 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
   const char* path_str = path.c_str();
-  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+  std::shared_ptr<struct stat> st(
+      static_cast<struct stat*>(
+          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
       tensorflow::io::plugin_memory_free);
 
   rc = Stat(path, st, status);
@@ -154,7 +177,7 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
       TF_SetStatus(status, TF_ALREADY_EXISTS, "");
       return 0;
     } else {
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
       return -1;
     }
   } else if (TF_GetCode(status) != TF_NOT_FOUND) {
@@ -173,63 +196,69 @@ int CHFS::CreateDir(const std::string path, TF_Status* status) {
 int CHFS::DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const char* path_str = path.c_str();
-  std::shared_ptr<struct stat> st(static_cast<struct stat*>(
-      tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+  const std::string cpath = getPath(path);
+  std::shared_ptr<struct stat> st(
+      static_cast<struct stat*>(
+          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
       tensorflow::io::plugin_memory_free);
 
-  rc = Stat(path, st, status);
+  rc = Stat(cpath, st, status);
   if (rc != 0) {
-    if (IsDir(st)) {
-      if (!is_dir) {
-        TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a directory");
-        return -1;
-      }
-      rc = libchfs->chfs_rmdir(path_str);
-      if (rc < 0) {
-        TF_SetStatus(status, TF_INTERNAL, "Error removing a directory");
-        return -1;
-      }
-    } else {
-      if (is_dir) {
-        TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a file");
-        return -1;
-      }
-      rc = libchfs->chfs_unlink(path_str);
-      if (rc < 0) {
-        TF_SetStatus(status, TF_INTERNAL, "Error removing a file");
-        return -1;
-      }
+    if (errno == ENOENT) {
+      TF_SetStatus(status, TF_NOT_FOUND, "");
+      return -1;
     }
   }
+  if (IsDir(st)) {
+    if (!is_dir) {
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a directory");
+      return -1;
+    }
+    rc = libchfs->chfs_rmdir(cpath.c_str());
+    if (rc != 0) {
+      TF_SetStatus(status, TF_INTERNAL, "Error removing a directory");
+      return -1;
+    }
+  } else {
+    if (is_dir) {
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "Entory is a file");
+      return -1;
+    }
+    rc = libchfs->chfs_unlink(cpath.c_str());
+    if (rc != 0) {
+      TF_SetStatus(status, TF_INTERNAL, "Error removing a file");
+      return -1;
+    }
+  }
+  return 0;
 }
 
 static void* LoadSharedLibrary(const char* library_filename,
                                TF_Status* status) {
-    std::vector<std::string> libdirs{"/usr/lib64", "/usr/local/lib64", "/opt/chfs/lib64"};
-    char* libdir;
-    void* handle;
+  std::vector<std::string> libdirs{"/usr/lib64", "/usr/local/lib64",
+                                   "/opt/chfs/lib64"};
+  char* libdir;
+  void* handle;
 
-    if ((libdir = std::getenv("TF_IO_CHFS_LIBRARY_DIR")) != nullptr) {
-        libdirs.push_back(libdir);
+  if ((libdir = std::getenv("TF_IO_CHFS_LIBRARY_DIR")) != nullptr) {
+    libdirs.push_back(libdir);
+  }
+
+  for (auto itr = libdirs.rbegin(), e = libdirs.rend(); itr != e; ++itr) {
+    std::string path = *itr;
+    if (path.back() != '/') path.push_back('/');
+    path.append(library_filename);
+    handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
+    if (handle != nullptr) {
+      TF_SetStatus(status, TF_OK, "");
+      return handle;
     }
+  }
 
-    for (auto itr = libdirs.rbegin(), e = libdirs.rend(); itr != e; ++itr) {
-        std::string path = *itr;
-        if (path.back() != '/')
-            path.push_back('/');
-        path.append(library_filename);
-        handle = dlopen(path.c_str(), RTLD_NOW | RTLD_LOCAL);
-        if (handle != nullptr) {
-            TF_SetStatus(status, TF_OK, "");
-            return handle;
-        }
-    }
-
-    std::string error_message =
-        absl::StrCat("Library (", library_filename, ") not found: ", dlerror());
-    TF_SetStatus(status, TF_NOT_FOUND, error_message.c_str());
-    return nullptr;
+  std::string error_message =
+      absl::StrCat("Library (", library_filename, ") not found: ", dlerror());
+  TF_SetStatus(status, TF_NOT_FOUND, error_message.c_str());
+  return nullptr;
 }
 
 static void* GetSymbolFromLibrary(void* handle, const char* symbol_name,
@@ -258,35 +287,34 @@ void BindFunc(void* handle, const char* name, std::function<R(Args...)>* func,
 }
 
 libCHFS::~libCHFS() {
-    if (libchfs_handle_ != nullptr) {
-        dlclose(libchfs_handle_);
-    }
+  if (libchfs_handle_ != nullptr) {
+    dlclose(libchfs_handle_);
+  }
 }
 
 void libCHFS::LoadAndBindCHFSLibs(TF_Status* status) {
-    libchfs_handle_ = LoadSharedLibrary("libchfs.so", status);
-    if (TF_GetCode(status) != TF_OK)
-        return;
+  libchfs_handle_ = LoadSharedLibrary("libchfs.so", status);
+  if (TF_GetCode(status) != TF_OK) return;
 
-#define BIND_CHFS_FUNC(handle, function)                \
-    do {                                                \
-        BindFunc(handle, #function, &function, status); \
-        if (TF_GetCode(status) != TF_OK) return;        \
-    } while (0);
+#define BIND_CHFS_FUNC(handle, function)            \
+  do {                                              \
+    BindFunc(handle, #function, &function, status); \
+    if (TF_GetCode(status) != TF_OK) return;        \
+  } while (0);
 
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_init);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_term);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_create);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_open);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_close);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_pread);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_pwrite);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_seek);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_unlink);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_mkdir);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_rmdir);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_stat);
-    BIND_CHFS_FUNC(libchfs_handle_, chfs_readdir);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_init);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_term);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_create);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_open);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_close);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_pread);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_pwrite);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_seek);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_unlink);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_mkdir);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_rmdir);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_stat);
+  // BIND_CHFS_FUNC(libchfs_handle_, chfs_readdir);
 
 #undef BIND_CHFS_FUNC
 }
