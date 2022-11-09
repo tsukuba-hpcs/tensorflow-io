@@ -138,7 +138,7 @@ int CHFS::Stat(const std::string path, std::shared_ptr<struct stat>& st,
                TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const char* path_str = GetPath(path).c_str();
+  std::string cpath = GetPath(path);
 
   if (st == NULL) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Error on stat file");
@@ -146,7 +146,7 @@ int CHFS::Stat(const std::string path, std::shared_ptr<struct stat>& st,
   }
 
   struct stat* st_ptr = st.get();
-  rc = libchfs->chfs_stat(path_str, st_ptr);
+  rc = libchfs->chfs_stat(cpath.c_str(), st_ptr);
   return rc;
 }
 
@@ -173,27 +173,26 @@ int CHFS::IsFile(std::shared_ptr<struct stat>& st) {
 int CHFS::CreateDir(const std::string path, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
-  const char* path_str = path.c_str();
+  const std::string cpath = GetPath(path);
   std::shared_ptr<struct stat> st(
       static_cast<struct stat*>(
           tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
       tensorflow::io::plugin_memory_free);
 
-  rc = Stat(path, st, status);
+  rc = Stat(cpath, st, status);
   if (rc != 0) {
-    if (IsDir(st)) {
-      TF_SetStatus(status, TF_ALREADY_EXISTS, "");
-      return 0;
-    } else {
+    if (errno != ENOENT) {
       TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
       return -1;
     }
-  } else if (TF_GetCode(status) != TF_NOT_FOUND) {
-    return -1;
+  }
+  if (IsDir(st)) {
+    TF_SetStatus(status, TF_ALREADY_EXISTS, "");
+    return 0;
   }
 
   TF_SetStatus(status, TF_OK, "");
-  rc = libchfs->chfs_mkdir(path_str, S_IWUSR | S_IRUSR | S_IXUSR);
+  rc = libchfs->chfs_mkdir(cpath.c_str(), S_IWUSR | S_IRUSR | S_IXUSR);
   if (rc) {
     TF_SetStatus(status, TF_INTERNAL, "Error creating directory");
   }
@@ -294,6 +293,15 @@ void BindFunc(void* handle, const char* name, std::function<R(Args...)>* func,
       GetSymbolFromLibrary(handle, name, status));
 }
 
+void BindFunc(void* handle, const char* name,
+        std::function<int(const char *, void *,
+        int (*)(void *, const char *, const struct stat *, off_t))>* func,
+        TF_Status* status) {
+  *func = reinterpret_cast<int (*)(const char*, void*,
+          int(*)(void *, const char *, const struct stat *, off_t))
+      >(GetSymbolFromLibrary(handle, name, status));
+}
+
 libCHFS::~libCHFS() {
   if (libchfs_handle_ != nullptr) {
     dlclose(libchfs_handle_);
@@ -322,7 +330,7 @@ void libCHFS::LoadAndBindCHFSLibs(TF_Status* status) {
   BIND_CHFS_FUNC(libchfs_handle_, chfs_mkdir);
   BIND_CHFS_FUNC(libchfs_handle_, chfs_rmdir);
   BIND_CHFS_FUNC(libchfs_handle_, chfs_stat);
-  // BIND_CHFS_FUNC(libchfs_handle_, chfs_readdir);
+  BIND_CHFS_FUNC(libchfs_handle_, chfs_readdir);
 
 #undef BIND_CHFS_FUNC
 }

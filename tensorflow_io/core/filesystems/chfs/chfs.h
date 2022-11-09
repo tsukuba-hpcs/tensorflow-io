@@ -61,8 +61,7 @@ class CHFS {
   ~CHFS();
 };
 
-using Filler =
-    std::function<int (*)(void*, const char*, const struct stat*, off_t)>;
+using Filler = std::function<int(void*, const char*, const struct stat*, off_t)>;
 
 class libCHFS {
  public:
@@ -82,7 +81,9 @@ class libCHFS {
   std::function<int(const char*, mode_t)> chfs_mkdir;
   std::function<int(const char*)> chfs_rmdir;
   std::function<int(const char*, struct stat*)> chfs_stat;
-  std::function<int(const char*, void*, Filler)> chfs_reddir;
+  std::function<int(const char *path, void *buf,
+          int (*)(void *, const char *, const struct stat *, off_t))> chfs_readdir;
+  // std::function<int(const char*, void*, Filler*)> chfs_reddir;
 
  private:
   void LoadAndBindCHFSLibs(TF_Status* status);

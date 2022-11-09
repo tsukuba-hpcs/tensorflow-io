@@ -430,11 +430,9 @@ void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
   ops->filesystem_ops->path_exists = tf_chfs_filesystem::PathExists;
   ops->filesystem_ops->create_dir = tf_chfs_filesystem::CreateDir;
   ops->filesystem_ops->delete_dir = tf_chfs_filesystem::DeleteDir;
-  ops->filesystem_ops->recursively_create_dir =
-      tf_chfs_filesystem::RecursivelyCreateDir;
+  // ops->filesystem_ops->recursively_create_dir = tf_chfs_filesystem::RecursivelyCreateDir;
   ops->filesystem_ops->is_directory = tf_chfs_filesystem::IsDir;
-  ops->filesystem_ops->delete_recursively =
-      tf_chfs_filesystem::DeleteRecursively;
+  // ops->filesystem_ops->delete_recursively = tf_chfs_filesystem::DeleteRecursively;
   ops->filesystem_ops->get_file_size = tf_chfs_filesystem::GetFileSize;
   ops->filesystem_ops->delete_file = tf_chfs_filesystem::DeleteFile;
   ops->filesystem_ops->rename_file = tf_chfs_filesystem::RenameFile;
