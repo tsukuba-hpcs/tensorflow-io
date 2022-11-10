@@ -328,17 +328,32 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
-  if (rc)
-    return;
+  if (rc) {
+      if (TF_GetCode(status) != TF_OK)
+          return;
+      if (errno == ENOENT) {
+          TF_SetStatus(status, TF_NOT_FOUND, "");
+          return;
+      }
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
+      return;
+  }
 
   stats->length = st->st_size;
   stats->mtime_nsec = static_cast<int64_t>(st->st_mtime) * 1e9;
-  if (chfs->IsDir(st)) {
+  if (S_ISDIR(st->st_mode)) {
     stats->is_directory = true;
   } else {
     stats->is_directory = false;
   }
 }
+
+// From https://github.com/daos-stack/tensorflow-io-daos/blob/devel/tensorflow_io/core/filesystems/dfs/dfs_filesystem.cc
+// Note: the signature for is_directory() has a bool for the return value, but
+// tensorflow does not use this, instead it interprets the status field to get
+// the result.  A value of TF_OK indicates that the object is a directory, and
+// a value of TF_FAILED_PRECONDITION indicates that the object is a file.  All
+// other status values throw an exception.
 
 static bool IsDir(const TF_Filesystem* filesystem, const char* path,
                   TF_Status* status) {
@@ -351,15 +366,22 @@ static bool IsDir(const TF_Filesystem* filesystem, const char* path,
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
-  if (rc != 0 && errno == ENOENT) {
-    TF_SetStatus(status, TF_NOT_FOUND, "");
+  if (rc) {
+    if (TF_GetCode(status) != TF_OK) // errors from precondition
+        return false;
+    if (errno == ENOENT) {
+        TF_SetStatus(status, TF_NOT_FOUND, "");
+        return false;
+    }
+    TF_SetStatus(status, TF_INTERNAL, strerror(errno));
     return false;
   }
 
-  if (chfs->IsDir(st)) {
-    return true;
+  if (!chfs->IsDir(st)) {
+      TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+      return false;
   }
-  return false;
+  return true;
 }
 
 static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path,
@@ -374,7 +396,14 @@ static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-    return rc;
+    if (TF_GetCode(status) != TF_OK) // errors from precondition
+        return -1;
+    if (errno == ENOENT) {
+        TF_SetStatus(status, TF_NOT_FOUND, "");
+        return -1;
+    }
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
+    return -1;
   }
   if (chfs->IsDir(st)) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "");

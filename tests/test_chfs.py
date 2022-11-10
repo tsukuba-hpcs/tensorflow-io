@@ -103,6 +103,21 @@ class CHFSTest(tf.test.TestCase):
         print("got:\t", results)
         self.assertTrue(entries == results)
 
+    def test_is_directory(self):
+        """Test is directory."""
+        # Setup and check preconditions.
+        parent = self._path_to("isdir")
+        dir_name = self._path_to("isdir/1")
+        file_name = self._path_to("7.txt")
+        tf.io.gfile.mkdir(parent)
+        with tf.io.gfile.GFile(file_name, "w") as write_file:
+            write_file.write("")
+        tf.io.gfile.mkdir(dir_name)
+        # Check that directory is a directory.
+        self.assertTrue(tf.io.gfile.isdir(dir_name))
+        # Check that file is not a directory.
+        self.assertFalse(tf.io.gfile.isdir(file_name))
+
     def test_copy(self):
         file_src = self._path_to("copy_src.txt")
         file_dest = self._path_to("copy_dest.txt")
