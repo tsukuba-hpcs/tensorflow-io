@@ -34,10 +34,6 @@ class CHFS {
 
   explicit CHFS(const char* server, TF_Status* status);
 
-  const std::string GetPath(const std::string& string);
-
-  const std::string GetParent(const std::string& string);
-
   int NewFile(const std::string path, FileMode mode, int flags,
               TF_Status* status);
 
@@ -89,5 +85,12 @@ class libCHFS {
   void LoadAndBindCHFSLibs(TF_Status* status);
   void* libchfs_handle_;
 };
+
+const std::string GetPath(const std::string& string);
+
+const std::string GetParent(const std::string& string);
+
+void CopyEntries(char*** entries, std::vector<std::string>& results);
+
 
 #endif

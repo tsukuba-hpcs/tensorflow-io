@@ -36,7 +36,6 @@ class CHFSTest(tf.test.TestCase):
         self.assertTrue(tf.io.gfile.exists(file_name))
 
         tf.io.gfile.remove(file_name)
-
         self.assertTrue(not tf.io.gfile.exists(file_name))
 
     def test_write_read_file(self):
@@ -52,6 +51,52 @@ class CHFSTest(tf.test.TestCase):
             data = read_file.read()
             self.assertEqual(data, "Hello,\nworld!")
 
+        tf.io.gfile.remove(file_name)
+        self.assertTrue(not tf.io.gfile.exists(file_name))
+
+    def test_mkdir_rmdir(self):
+        """Test mkdir/rmdir"""
+        dir_name = self._path_to("testdir")
+        if tf.io.gfile.exists(dir_name):
+            tf.io.gfile.rmtree(dir_name)
+
+        tf.io.gfile.mkdir(dir_name)
+        self.assertTrue(tf.io.gfile.isdir(dir_name))
+        self.assertTrue(tf.io.gfile.exists(dir_name))
+
+        tf.io.gfile.rmtree(dir_name)
+        self.assertTrue(not tf.io.gfile.exists(dir_name))
+
+    def test_listdir(self):
+        dir_name = self._path_to("listdir")
+        tf.io.gfile.mkdir(dir_name)
+        # create files and a directory
+        entries = ["test1.txt", "test2.txt"]
+        tf.io.gfile.mkdir("test_dir")
+        for entry in entries:
+            file_path = self._path_to(os.path.join(dir_name, entry))
+            with tf.io.gfile.GFile(file_path, "w") as write_file:
+                write_file.write("")
+        entries.append("test_dir")
+
+        results = tf.io.gfile.listdir(dir_name)
+
+        entries.sort()
+        results.sort()
+        self.assertTrue(entries, results)
+
+    def test_copy(self):
+        file_src = self._path_to("copy_src.txt")
+        file_dest = self._path_to("copy_dest.txt")
+        if not tf.io.gfile.exists(file_src):
+            with tf.io.gfile.GFile(file_src, "w") as write_file:
+                write_file.write("Hello,\nworld!")
+        tf.io.gfile.copy(file_src, file_dest)
+        self.assertTrue(tf.io.gfile.exists(file_dest))
+
+        with tf.io.gfile.GFile(file_dest, "r") as read_file:
+            data = read_file.read()
+            self.assertTrue(data, "Hello,\nworld!")
 
 if __name__ == "__main__":
     tf.test.main()

@@ -43,13 +43,25 @@ mode_t getFlag(FileMode mode) {
   }
 }
 
-const std::string CHFS::GetPath(const std::string& path) {
+void CopyEntries(char*** entries, std::vector<std::string>& results) {
+  *entries = static_cast<char**>(
+      tensorflow::io::plugin_memory_allocate(results.size() * sizeof(char*)));
+
+  for (uint32_t i = 0; i < results.size(); i++) {
+    (*entries)[i] = static_cast<char*>(tensorflow::io::plugin_memory_allocate(
+        results[i].size() * sizeof(char)));
+    if (results[i][0] == '/') results[i].erase(0, 1);
+    strcpy((*entries)[i], results[i].c_str());
+  }
+}
+
+const std::string GetPath(const std::string& path) {
   auto pos = path.find("://");
   if (pos != std::string::npos) return path.substr(pos + 3);
   return path;
 }
 
-const std::string CHFS::GetParent(const std::string& path) {
+const std::string GetParent(const std::string& path) {
   std::filesystem::path p = path;
   return p.parent_path();
 }
@@ -170,6 +182,26 @@ int CHFS::IsFile(std::shared_ptr<struct stat>& st) {
   return false;
 }
 
+static std::vector<std::string> readdir_entries;
+
+static int readdirFiller(void *buf, const char *name, const struct stat *st, off_t off) {
+    if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
+        return 0;
+
+    std::string filename(name);
+    readdir_entries.emplace_back(filename);
+    return 0;
+}
+
+int CHFS::ReadDir(const std::string path, std::vector<std::string>& child) {
+    int rc = 0;
+    char **buffer;
+    std::string cpath = GetPath(path);
+
+    rc = libchfs->chfs_readdir(cpath.c_str(), NULL, readdirFiller);
+    return rc;
+}
+
 int CHFS::CreateDir(const std::string path, TF_Status* status) {
   TF_SetStatus(status, TF_OK, "");
   int rc;
@@ -211,10 +243,11 @@ int CHFS::DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
 
   rc = Stat(cpath, st, status);
   if (rc != 0) {
-    if (errno == ENOENT) {
+    if (errno == ENOENT)
       TF_SetStatus(status, TF_NOT_FOUND, "");
-      return -1;
-    }
+    else
+      TF_SetStatus(status, TF_INTERNAL, "");
+    return -1;
   }
   if (IsDir(st)) {
     if (!is_dir) {

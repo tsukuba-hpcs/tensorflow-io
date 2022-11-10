@@ -18,7 +18,7 @@ typedef struct CHFSRandomAccessFile {
 
   CHFSRandomAccessFile(CHFS* chfs, std::string path, int fd)
       : chfs(chfs), fd(fd) {
-    path = chfs->GetPath(path);
+    path = GetPath(path);
     std::shared_ptr<struct stat> st(
         static_cast<struct stat*>(
             tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
@@ -90,7 +90,7 @@ typedef struct CHFSWritableFile {
   bool size_known;
 
   CHFSWritableFile(CHFS* chfs, std::string path, int fd) : chfs(chfs), fd(fd) {
-    path = chfs->GetPath(path);
+    path = GetPath(path);
     size_known = false;
     size_t dummy;
     get_file_size(dummy);
@@ -389,8 +389,40 @@ static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
 }
 
 static int GetChildren(const TF_Filesystem* filesystem, const char* path,
-                       char*** entries, TF_Status* status) {
-  return 0;
+        char*** entries, TF_Status* status) {
+    TF_SetStatus(status, TF_OK, "");
+    int rc;
+    std::shared_ptr<struct stat> st(
+            static_cast<struct stat*>(
+                tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+            tensorflow::io::plugin_memory_free);
+    auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+
+    rc = chfs->Stat(path, st, status);
+    if (rc) {
+        if (errno == ENOENT)
+            TF_SetStatus(status, TF_NOT_FOUND, "");
+        else
+            TF_SetStatus(status, TF_INTERNAL, strerror(errno));
+        return -1;
+    }
+    if (!chfs->IsDir(st)) {
+        TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+        return -1;
+    }
+
+    std::vector<std::string> children;
+    rc = chfs->ReadDir(path, children);
+    if (rc) {
+        TF_SetStatus(status, TF_INTERNAL, strerror(errno));
+        return -1;
+    }
+
+    uint32_t nr = children.size();
+
+    CopyEntries(entries, children);
+
+    return nr;
 }
 
 }  // namespace tf_chfs_filesystem
