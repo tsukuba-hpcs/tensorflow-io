@@ -17,7 +17,7 @@ class CHFSTest(tf.test.TestCase):
 
     def __init__(self, methodName="runTest"):  # pylint: disable=invalid-name
         self.server = os.environ["CHFS_SERVER"]
-        self.path_root = "chfs://"
+        self.path_root = "chfs:///"
         super().__init__(methodName)
 
     def _path_to(self, name):
@@ -28,7 +28,7 @@ class CHFSTest(tf.test.TestCase):
         # check the precondition
         file_name = self._path_to("testfile")
         if tf.io.gfile.exists(file_name):
-            tf.io.gfile.remove(file_name)
+            tf.io.gfile.rmtree(file_name)
         # create file
         with tf.io.gfile.GFile(file_name, "w") as write_file:
             write_file.write("")
@@ -54,27 +54,43 @@ class CHFSTest(tf.test.TestCase):
         tf.io.gfile.remove(file_name)
         self.assertTrue(not tf.io.gfile.exists(file_name))
 
-    def test_mkdir_rmdir(self):
-        """Test mkdir/rmdir"""
-        dir_name = self._path_to("testdir")
-        if tf.io.gfile.exists(dir_name):
-            tf.io.gfile.rmtree(dir_name)
+    ##
+    # def test_mkdir_rmdir(self):
+    #     """Test mkdir/rmdir"""
+    #     dir_name = self._path_to("mkdir_rmdir")
+    #     if tf.io.gfile.exists(dir_name):
+    #         tf.io.gfile.rmtree(dir_name)
 
-        tf.io.gfile.mkdir(dir_name)
-        self.assertTrue(tf.io.gfile.isdir(dir_name))
-        self.assertTrue(tf.io.gfile.exists(dir_name))
+    #     tf.io.gfile.mkdir(dir_name)
+    #     self.assertTrue(tf.io.gfile.isdir(dir_name))
+    #     self.assertTrue(tf.io.gfile.exists(dir_name))
 
-        tf.io.gfile.rmtree(dir_name)
-        self.assertTrue(not tf.io.gfile.exists(dir_name))
+    #     tf.io.gfile.rmtree(dir_name)
+    #     self.assertTrue(not tf.io.gfile.exists(dir_name))
 
     def test_listdir(self):
         dir_name = self._path_to("listdir")
+        if tf.io.gfile.exists(dir_name):
+            # TODO: implement Recursive deleting
+            if tf.io.gfile.exists(os.path.join(dir_name, "test1.txt")):
+                tf.io.gfile.remove(os.path.join(dir_name, "test1.txt"))
+            if tf.io.gfile.exists(os.path.join(dir_name, "test2.txt")):
+                tf.io.gfile.remove(os.path.join(dir_name, "test2.txt"))
+            if tf.io.gfile.exists(os.path.join(dir_name, "test_dir")):
+                tf.io.gfile.rmtree(os.path.join(dir_name, "test_dir"))
+            tf.io.gfile.rmtree(dir_name)
         tf.io.gfile.mkdir(dir_name)
+        self.assertTrue(tf.io.gfile.exists(dir_name))
         # create files and a directory
         entries = ["test1.txt", "test2.txt"]
-        tf.io.gfile.mkdir("test_dir")
+        inner_name = os.path.join(dir_name, "test_dir")
+        if tf.io.gfile.exists(inner_name):
+            tf.io.gfile.rmtree(inner_name)
+        tf.io.gfile.mkdir(inner_name)
+        self.assertTrue(tf.io.gfile.exists(inner_name))
+
         for entry in entries:
-            file_path = self._path_to(os.path.join(dir_name, entry))
+            file_path = self._path_to(f"listdir/{entry}")
             with tf.io.gfile.GFile(file_path, "w") as write_file:
                 write_file.write("")
         entries.append("test_dir")
@@ -83,14 +99,20 @@ class CHFSTest(tf.test.TestCase):
 
         entries.sort()
         results.sort()
-        self.assertTrue(entries, results)
+        print("want:\t", entries)
+        print("got:\t", results)
+        self.assertTrue(entries == results)
 
     def test_copy(self):
         file_src = self._path_to("copy_src.txt")
         file_dest = self._path_to("copy_dest.txt")
-        if not tf.io.gfile.exists(file_src):
-            with tf.io.gfile.GFile(file_src, "w") as write_file:
-                write_file.write("Hello,\nworld!")
+        if tf.io.gfile.exists(file_src):
+            tf.io.gfile.remove(file_src)
+        if tf.io.gfile.exists(file_dest):
+            tf.io.gfile.remove(file_dest)
+
+        with tf.io.gfile.GFile(file_src, "w") as write_file:
+            write_file.write("Hello,\nworld!")
         tf.io.gfile.copy(file_src, file_dest)
         self.assertTrue(tf.io.gfile.exists(file_dest))
 

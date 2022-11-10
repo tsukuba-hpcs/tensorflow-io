@@ -57,7 +57,8 @@ void CopyEntries(char*** entries, std::vector<std::string>& results) {
 
 const std::string GetPath(const std::string& path) {
   auto pos = path.find("://");
-  if (pos != std::string::npos) return path.substr(pos + 3);
+  if (pos != std::string::npos)
+      return path.substr(pos + 3);
   return path;
 }
 
@@ -82,7 +83,7 @@ int CHFS::NewFile(const std::string path, FileMode mode, int32_t flags,
     return -1;
   }
 
-  if (st != nullptr && IsDir(st)) {
+  if (IsDir(st)) {
     TF_SetStatus(status, TF_FAILED_PRECONDITION, "Path is a directory");
     return -1;
   }
@@ -199,6 +200,10 @@ int CHFS::ReadDir(const std::string path, std::vector<std::string>& child) {
     std::string cpath = GetPath(path);
 
     rc = libchfs->chfs_readdir(cpath.c_str(), NULL, readdirFiller);
+
+    for (auto &entry : readdir_entries) {
+        child.emplace_back(entry);
+    }
     return rc;
 }
 
@@ -245,7 +250,7 @@ int CHFS::DeleteEntry(const std::string path, bool is_dir, TF_Status* status) {
   if (rc != 0) {
     if (errno == ENOENT)
       TF_SetStatus(status, TF_NOT_FOUND, "");
-    else
+    else if (TF_GetCode(status) != TF_FAILED_PRECONDITION)
       TF_SetStatus(status, TF_INTERNAL, "");
     return -1;
   }

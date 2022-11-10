@@ -307,7 +307,9 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-    if (TF_GetCode(status) == TF_OK && errno == ENOENT) {
+    if (TF_GetCode(status) != TF_OK) // errors from precondition
+      return;
+    if (errno == ENOENT) {
       TF_SetStatus(status, TF_NOT_FOUND, "");
       return;
     }
@@ -326,10 +328,8 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
   auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
   rc = chfs->Stat(path, st, status);
-  if (rc) {
-    TF_SetStatus(status, TF_INTERNAL, strerror(errno));
+  if (rc)
     return;
-  }
 
   stats->length = st->st_size;
   stats->mtime_nsec = static_cast<int64_t>(st->st_mtime) * 1e9;
