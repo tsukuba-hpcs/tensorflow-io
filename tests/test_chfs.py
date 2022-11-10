@@ -54,20 +54,6 @@ class CHFSTest(tf.test.TestCase):
         tf.io.gfile.remove(file_name)
         self.assertTrue(not tf.io.gfile.exists(file_name))
 
-    ##
-    # def test_mkdir_rmdir(self):
-    #     """Test mkdir/rmdir"""
-    #     dir_name = self._path_to("mkdir_rmdir")
-    #     if tf.io.gfile.exists(dir_name):
-    #         tf.io.gfile.rmtree(dir_name)
-
-    #     tf.io.gfile.mkdir(dir_name)
-    #     self.assertTrue(tf.io.gfile.isdir(dir_name))
-    #     self.assertTrue(tf.io.gfile.exists(dir_name))
-
-    #     tf.io.gfile.rmtree(dir_name)
-    #     self.assertTrue(not tf.io.gfile.exists(dir_name))
-
     def test_listdir(self):
         dir_name = self._path_to("listdir")
         if tf.io.gfile.exists(dir_name):
@@ -118,6 +104,18 @@ class CHFSTest(tf.test.TestCase):
         # Check that file is not a directory.
         self.assertFalse(tf.io.gfile.isdir(file_name))
 
+    def test_make_dirs(self):
+        """Test make dirs."""
+        dir_name = self.path_root
+        tf.io.gfile.mkdir(dir_name)
+        self.assertTrue(tf.io.gfile.isdir(dir_name))
+
+        parent = self._path_to("test")
+        dir_name = self._path_to("test/directory")
+        tf.io.gfile.mkdir(parent)
+        tf.io.gfile.makedirs(dir_name)
+        self.assertTrue(tf.io.gfile.isdir(dir_name))
+
     def test_copy(self):
         file_src = self._path_to("copy_src.txt")
         file_dest = self._path_to("copy_dest.txt")
@@ -134,6 +132,16 @@ class CHFSTest(tf.test.TestCase):
         with tf.io.gfile.GFile(file_dest, "r") as read_file:
             data = read_file.read()
             self.assertTrue(data, "Hello,\nworld!")
+
+    def test_remove(self):
+        """Test remove."""
+        file_name = self._path_to("file_to_be_removed")
+        self.assertFalse(tf.io.gfile.exists(file_name))
+        with tf.io.gfile.GFile(file_name, "w") as write_file:
+            write_file.write("")
+        self.assertTrue(tf.io.gfile.exists(file_name))
+        tf.io.gfile.remove(file_name)
+        self.assertFalse(tf.io.gfile.exists(file_name))
 
 if __name__ == "__main__":
     tf.test.main()
