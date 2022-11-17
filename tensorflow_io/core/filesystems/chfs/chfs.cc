@@ -57,8 +57,7 @@ void CopyEntries(char*** entries, std::vector<std::string>& results) {
 
 const std::string GetPath(const std::string& path) {
   auto pos = path.find("://");
-  if (pos != std::string::npos)
-      return path.substr(pos + 3);
+  if (pos != std::string::npos) return path.substr(pos + 3);
   return path;
 }
 
@@ -185,26 +184,28 @@ int CHFS::IsFile(std::shared_ptr<struct stat>& st) {
 
 static std::vector<std::string> readdir_entries;
 
-static int readdirFiller(void *buf, const char *name, const struct stat *st, off_t off) {
-    if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
-        return 0;
-
-    std::string filename(name);
-    readdir_entries.emplace_back(filename);
+static int readdirFiller(void* buf, const char* name, const struct stat* st,
+                         off_t off) {
+  if (name[0] == '.' &&
+      (name[1] == '\0' || (name[1] == '.' && name[2] == '\0')))
     return 0;
+
+  std::string filename(name);
+  readdir_entries.emplace_back(filename);
+  return 0;
 }
 
 int CHFS::ReadDir(const std::string path, std::vector<std::string>& child) {
-    int rc = 0;
-    char **buffer;
-    std::string cpath = GetPath(path);
+  int rc = 0;
+  char** buffer;
+  std::string cpath = GetPath(path);
 
-    rc = libchfs->chfs_readdir(cpath.c_str(), NULL, readdirFiller);
+  rc = libchfs->chfs_readdir(cpath.c_str(), NULL, readdirFiller);
 
-    for (auto &entry : readdir_entries) {
-        child.emplace_back(entry);
-    }
-    return rc;
+  for (auto& entry : readdir_entries) {
+    child.emplace_back(entry);
+  }
+  return rc;
 }
 
 int CHFS::CreateDir(const std::string path, TF_Status* status) {
@@ -332,12 +333,14 @@ void BindFunc(void* handle, const char* name, std::function<R(Args...)>* func,
 }
 
 void BindFunc(void* handle, const char* name,
-        std::function<int(const char *, void *,
-        int (*)(void *, const char *, const struct stat *, off_t))>* func,
-        TF_Status* status) {
-  *func = reinterpret_cast<int (*)(const char*, void*,
-          int(*)(void *, const char *, const struct stat *, off_t))
-      >(GetSymbolFromLibrary(handle, name, status));
+              std::function<int(const char*, void*,
+                                int (*)(void*, const char*, const struct stat*,
+                                        off_t))>* func,
+              TF_Status* status) {
+  *func = reinterpret_cast<int (*)(
+      const char*, void*,
+      int (*)(void*, const char*, const struct stat*, off_t))>(
+      GetSymbolFromLibrary(handle, name, status));
 }
 
 libCHFS::~libCHFS() {

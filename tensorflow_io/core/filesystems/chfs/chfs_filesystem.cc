@@ -307,7 +307,7 @@ static void PathExists(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-    if (TF_GetCode(status) != TF_OK) // errors from precondition
+    if (TF_GetCode(status) != TF_OK)  // errors from precondition
       return;
     if (errno == ENOENT) {
       TF_SetStatus(status, TF_NOT_FOUND, "");
@@ -329,14 +329,13 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-      if (TF_GetCode(status) != TF_OK)
-          return;
-      if (errno == ENOENT) {
-          TF_SetStatus(status, TF_NOT_FOUND, "");
-          return;
-      }
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
+    if (TF_GetCode(status) != TF_OK) return;
+    if (errno == ENOENT) {
+      TF_SetStatus(status, TF_NOT_FOUND, "");
       return;
+    }
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
+    return;
   }
 
   stats->length = st->st_size;
@@ -348,7 +347,8 @@ static void Stat(const TF_Filesystem* filesystem, const char* path,
   }
 }
 
-// From https://github.com/daos-stack/tensorflow-io-daos/blob/devel/tensorflow_io/core/filesystems/dfs/dfs_filesystem.cc
+// From
+// https://github.com/daos-stack/tensorflow-io-daos/blob/devel/tensorflow_io/core/filesystems/dfs/dfs_filesystem.cc
 // Note: the signature for is_directory() has a bool for the return value, but
 // tensorflow does not use this, instead it interprets the status field to get
 // the result.  A value of TF_OK indicates that the object is a directory, and
@@ -367,19 +367,19 @@ static bool IsDir(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-    if (TF_GetCode(status) != TF_OK) // errors from precondition
-        return false;
+    if (TF_GetCode(status) != TF_OK)  // errors from precondition
+      return false;
     if (errno == ENOENT) {
-        TF_SetStatus(status, TF_NOT_FOUND, "");
-        return false;
+      TF_SetStatus(status, TF_NOT_FOUND, "");
+      return false;
     }
     TF_SetStatus(status, TF_INTERNAL, strerror(errno));
     return false;
   }
 
   if (!chfs->IsDir(st)) {
-      TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
-      return false;
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+    return false;
   }
   return true;
 }
@@ -396,11 +396,11 @@ static int64_t GetFileSize(const TF_Filesystem* filesystem, const char* path,
 
   rc = chfs->Stat(path, st, status);
   if (rc) {
-    if (TF_GetCode(status) != TF_OK) // errors from precondition
-        return -1;
+    if (TF_GetCode(status) != TF_OK)  // errors from precondition
+      return -1;
     if (errno == ENOENT) {
-        TF_SetStatus(status, TF_NOT_FOUND, "");
-        return -1;
+      TF_SetStatus(status, TF_NOT_FOUND, "");
+      return -1;
     }
     TF_SetStatus(status, TF_FAILED_PRECONDITION, strerror(errno));
     return -1;
@@ -418,40 +418,40 @@ static char* TranslateName(const TF_Filesystem* filesystem, const char* uri) {
 }
 
 static int GetChildren(const TF_Filesystem* filesystem, const char* path,
-        char*** entries, TF_Status* status) {
-    TF_SetStatus(status, TF_OK, "");
-    int rc;
-    std::shared_ptr<struct stat> st(
-            static_cast<struct stat*>(
-                tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
-            tensorflow::io::plugin_memory_free);
-    auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
+                       char*** entries, TF_Status* status) {
+  TF_SetStatus(status, TF_OK, "");
+  int rc;
+  std::shared_ptr<struct stat> st(
+      static_cast<struct stat*>(
+          tensorflow::io::plugin_memory_allocate(sizeof(struct stat))),
+      tensorflow::io::plugin_memory_free);
+  auto chfs = static_cast<CHFS*>(filesystem->plugin_filesystem);
 
-    rc = chfs->Stat(path, st, status);
-    if (rc) {
-        if (errno == ENOENT)
-            TF_SetStatus(status, TF_NOT_FOUND, "");
-        else
-            TF_SetStatus(status, TF_INTERNAL, strerror(errno));
-        return -1;
-    }
-    if (!chfs->IsDir(st)) {
-        TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
-        return -1;
-    }
+  rc = chfs->Stat(path, st, status);
+  if (rc) {
+    if (errno == ENOENT)
+      TF_SetStatus(status, TF_NOT_FOUND, "");
+    else
+      TF_SetStatus(status, TF_INTERNAL, strerror(errno));
+    return -1;
+  }
+  if (!chfs->IsDir(st)) {
+    TF_SetStatus(status, TF_FAILED_PRECONDITION, "");
+    return -1;
+  }
 
-    std::vector<std::string> children;
-    rc = chfs->ReadDir(path, children);
-    if (rc) {
-        TF_SetStatus(status, TF_INTERNAL, strerror(errno));
-        return -1;
-    }
+  std::vector<std::string> children;
+  rc = chfs->ReadDir(path, children);
+  if (rc) {
+    TF_SetStatus(status, TF_INTERNAL, strerror(errno));
+    return -1;
+  }
 
-    uint32_t nr = children.size();
+  uint32_t nr = children.size();
 
-    CopyEntries(entries, children);
+  CopyEntries(entries, children);
 
-    return nr;
+  return nr;
 }
 
 }  // namespace tf_chfs_filesystem
@@ -491,9 +491,11 @@ void ProvideFilesystemSupportFor(TF_FilesystemPluginOps* ops, const char* uri) {
   ops->filesystem_ops->path_exists = tf_chfs_filesystem::PathExists;
   ops->filesystem_ops->create_dir = tf_chfs_filesystem::CreateDir;
   ops->filesystem_ops->delete_dir = tf_chfs_filesystem::DeleteDir;
-  // ops->filesystem_ops->recursively_create_dir = tf_chfs_filesystem::RecursivelyCreateDir;
+  // ops->filesystem_ops->recursively_create_dir =
+  // tf_chfs_filesystem::RecursivelyCreateDir;
   ops->filesystem_ops->is_directory = tf_chfs_filesystem::IsDir;
-  // ops->filesystem_ops->delete_recursively = tf_chfs_filesystem::DeleteRecursively;
+  // ops->filesystem_ops->delete_recursively =
+  // tf_chfs_filesystem::DeleteRecursively;
   ops->filesystem_ops->get_file_size = tf_chfs_filesystem::GetFileSize;
   ops->filesystem_ops->delete_file = tf_chfs_filesystem::DeleteFile;
   ops->filesystem_ops->rename_file = tf_chfs_filesystem::RenameFile;
