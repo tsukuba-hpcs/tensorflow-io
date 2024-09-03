@@ -134,7 +134,7 @@ jobs:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -175,7 +175,7 @@ jobs:
         python: ['3.8', '3.9']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-${{ matrix.python }}-wheel
           path: wheelhouse
@@ -248,7 +248,7 @@ jobs:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -282,7 +282,7 @@ jobs:
         python: ['3.8', '3.9']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-${{ matrix.python }}-wheel
           path: wheelhouse
@@ -361,7 +361,7 @@ jobs:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -392,7 +392,7 @@ jobs:
         python: ['3.8', '3.9']
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-${{ matrix.python }}-wheel
           path: wheel
@@ -445,51 +445,51 @@ jobs:
     needs: [linux-wheel, macos-wheel, windows-wheel]
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.7-wheel
           path: macOS-3.7-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.8-wheel
           path: macOS-3.8-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.9-wheel
           path: macOS-3.9-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.10-wheel
           path: macOS-3.10-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.7-wheel
           path: Linux-3.7-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.8-wheel
           path: Linux-3.8-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.9-wheel
           path: Linux-3.9-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.10-wheel
           path: Linux-3.10-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.7-wheel
           path: Windows-3.7-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.8-wheel
           path: Windows-3.8-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.9-wheel
           path: Windows-3.9-wheel
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.10-wheel
           path: Windows-3.10-wheel
@@ -522,7 +522,7 @@ jobs:
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: tensorflow-io-release
           path: wheelhouse
@@ -600,13 +600,13 @@ jobs:
       matrix:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: BUILD_NUMBER
       - uses: einaregilsson/build-number@v3
       - run: echo "Build number is $BUILD_NUMBER"
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -647,13 +647,13 @@ jobs:
       matrix:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: BUILD_NUMBER
       - uses: einaregilsson/build-number@v3
       - run: echo "Build number is $BUILD_NUMBER"
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -687,13 +687,13 @@ jobs:
       matrix:
         python: ['3.7', '3.8', '3.9', '3.10']
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: BUILD_NUMBER
       - uses: einaregilsson/build-number@v3
       - run: echo "Build number is $BUILD_NUMBER"
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ runner.os }}-bazel-bin
           path: bazel-bin
@@ -721,51 +721,51 @@ jobs:
     needs: [linux-nightly, macos-nightly, windows-nightly]
     runs-on: ubuntu-18.04
     steps:
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.7-nightly
           path: macOS-3.7-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.8-nightly
           path: macOS-3.8-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.9-nightly
           path: macOS-3.9-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: macOS-3.10-nightly
           path: macOS-3.10-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.7-nightly
           path: Linux-3.7-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.8-nightly
           path: Linux-3.8-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.9-nightly
           path: Linux-3.9-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Linux-3.10-nightly
           path: Linux-3.10-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.7-nightly
           path: Windows-3.7-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.8-nightly
           path: Windows-3.8-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.9-nightly
           path: Windows-3.9-nightly
-      - uses: actions/download-artifact@v1
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: Windows-3.10-nightly
           path: Windows-3.10-nightly
